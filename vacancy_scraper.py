@@ -86,27 +86,31 @@ def scrape_vacancies(driver, search_config: dict, full_config: dict | None = Non
             print(f"    Warning: navigation failed ({e}), skipping...")
             break
 
-        # Extract ALL hrefs into a plain list BEFORE navigating anywhere
-        href_list = _extract_vacancy_links(driver)
+        # Extract title, company, and href from the search page (no navigation needed)
+        listing_info = _extract_listing_info(driver)
 
-        if not href_list:
-            print("    No valid vacancy links found. Stopping.")
+        if not listing_info:
+            print("    No valid vacancy entries found. Stopping.")
             break
 
         duplicates = set(v["link"] for v in vacancies)
         scraped_on_this_page = 0
 
-        for href in href_list:
+        for title, company, href in listing_info:
             if scraped_on_this_page >= max_per_page_cap:
                 print(f"\n  ⚠️  Reached per-page cap ({max_per_page_cap}). Stopping page.")
                 break
-            if not href or href in duplicates:
+            if href in duplicates:
                 continue
-            if "ufa.hh.ru/vacancy" not in href and "hh.ru/vacancy" not in href:
+
+            # Check if already viewed (by name + company) BEFORE navigating
+            if is_viewed(title, company):
+                print(f"  📖 SKIP — already viewed: {title} @ {company}")
                 continue
+
             duplicates.add(href)
 
-            vacancy = _fetch_vacancy_detail(driver, href, ai_enabled, full_config, applied_set, viewed_set, record_viewed, len(vacancies) + 1)
+            vacancy = _fetch_vacancy_detail(driver, href, title, company, ai_enabled, full_config, applied_set, viewed_set, record_viewed, len(vacancies) + 1)
             if vacancy is not None:
                 vacancies.append(vacancy)
                 scraped_on_this_page += 1
@@ -160,7 +164,7 @@ def _extract_vacancy_links(driver) -> list[str]:
     return href_list
 
 
-def _fetch_vacancy_detail(driver, href: str, ai_enabled: bool, full_config: dict, applied_set: set[str], viewed_set: dict[str, bool], record_viewed: callable, vacancy_number: int):
+def _fetch_vacancy_detail(driver, href: str, title: str, company: str, ai_enabled: bool, full_config: dict, applied_set: set[str], viewed_set: dict[str, bool], record_viewed: callable, vacancy_number: int):
     """Navigate to a vacancy page and extract its content."""
     try:
         driver.get(href)
@@ -180,22 +184,13 @@ def _fetch_vacancy_detail(driver, href: str, ai_enabled: bool, full_config: dict
         print(f"\n  ⏭️  SKIP — already applied: {href[:80]}...")
         return None
 
-    # Extract name and company
-    title_text = _extract_title(driver)
-    company_text = _extract_company(driver)
-
-    # Skip already-viewed vacancies (by name + company)
-    if company_text and is_viewed(title_text, company_text):
-        print(f"\n  📖 SKIP — already viewed: {title_text} @ {company_text}")
-        return None
-
     current_vacancy = {"link": href}
 
     # --- AI analysis ---
     ts = time.strftime("[%Y-%m-%d %H:%M:%S]")
-    print(f"\n  {ts}  #{vacancy_number}. 📎 Vacancy: {title_text or 'Не указано'}")
-    if company_text:
-        print(f"     🏢 Company: {company_text}")
+    print(f"\n  {ts}  #{vacancy_number}. 📎 Vacancy: {title}")
+    if company:
+        print(f"     🏢 Company: {company}")
     print(f"     🔗 {href}")
 
     if ai_enabled and full_desc:
@@ -215,8 +210,7 @@ def _fetch_vacancy_detail(driver, href: str, ai_enabled: bool, full_config: dict
         print(f"  ⚠️ Full description is empty — skipping AI analysis")
 
     # Record as viewed
-    if title_text:
-        record_viewed(title_text, company_text or "")
+    record_viewed(title, company)
 
     return current_vacancy
 
@@ -259,19 +253,6 @@ def _extract_full_desc(driver) -> str:
     return full_desc
 
 
-def _extract_title(driver) -> str:
-    """Extract the vacancy title from the detail page."""
-    for sel in [".vacancy-title h1", "h1[data-qa='vacancy-title']"]:
-        try:
-            title_el = driver.find_element("css selector", sel)
-            text = title_el.text.strip() if title_el else ""
-            if text:
-                return text
-        except Exception:
-            continue
-    return ""
-
-
 def _has_next_page(driver) -> bool:
     """Check if a 'Next' pagination button exists."""
     next_selectors = [
@@ -291,21 +272,27 @@ def _has_next_page(driver) -> bool:
     return False
 
 
-def _extract_company(driver) -> str:
-    """Extract the company name from the vacancy detail page."""
-    for sel in [
-        "a[href*='employers'] .h8",
-        "a[href*='employers'] .vacancy-header__company",
-        "a[data-qa='vacancy-comp-name'] h2",
-        "a[data-qa='vacancy-comp-name']",
-        ".vacancy__company-name",
-        "h1 + * .h8",
-    ]:
+def _extract_listing_info(driver) -> list[tuple[str, str, str]]:
+    """Extract (title, company, href) from all vacancy cards on the search page."""
+    results: list[tuple[str, str, str]] = []
+    # Each vacancy card is in a block with a title link and company link
+    cards = driver.find_elements("css selector", "a[data-qa='search-vacancy-title']")
+    for card in cards:
         try:
-            el = driver.find_element("css selector", sel)
-            text = el.text.strip()
-            if text:
-                return text
+            # Get title text and href from the title link itself
+            title = card.text.strip()
+            href = card.get_attribute("href")
+            if not href:
+                continue
+
+            # Company is in the same card block, look for company link
+            company = ""
+            try:
+                company_el = card.find_element("css selector", "a[data-qa='search-vacancy-company-link']")
+                company = company_el.text.strip()
+            except Exception:
+                pass
+            results.append((title, company, href))
         except Exception:
             continue
-    return ""
+    return results
