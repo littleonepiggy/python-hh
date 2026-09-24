@@ -22,7 +22,7 @@
       "order_by": "publication_time"
     },
     "max_pages": 1,
-    "max_vacancies_per_page": 48,
+    "max_vacancies_per_page": 2,
     "delay_range": [
       1.0,
       1.5
