@@ -9,6 +9,7 @@ from urllib.parse import urlencode
 from selenium.common.exceptions import StaleElementReferenceException
 from ai_analyzer import analyze_vacancy
 from output_formatter import print_output
+from viewed_tracker import is_viewed, record_viewed, load_viewed
 
 PROJECT_DIR = Path(__file__).resolve().parent
 
@@ -54,6 +55,10 @@ def scrape_vacancies(driver, search_config: dict, full_config: dict | None = Non
                     applied_set.add(link)
     except Exception:
         pass
+
+    # Load viewed vacancies (name + company)
+    viewed_set = load_viewed()
+    print(f"  📖 Loaded {len(viewed_set)} viewed vacancy(es).")
 
     start_page = search_config.get("page", 1)
 
@@ -103,7 +108,7 @@ def scrape_vacancies(driver, search_config: dict, full_config: dict | None = Non
 
             print(f"  -> Extracting detail #{len(vacancies)+1}: {href[:80]}...")
 
-            vacancy = _fetch_vacancy_detail(driver, href, ai_enabled, full_config, applied_set)
+            vacancy = _fetch_vacancy_detail(driver, href, ai_enabled, full_config, applied_set, viewed_set, record_viewed)
             if vacancy is not None:
                 vacancies.append(vacancy)
                 scraped_on_this_page += 1
@@ -160,7 +165,7 @@ def _extract_vacancy_links(driver) -> list[str]:
     return href_list
 
 
-def _fetch_vacancy_detail(driver, href: str, ai_enabled: bool, full_config: dict, applied_set: set[str]):
+def _fetch_vacancy_detail(driver, href: str, ai_enabled: bool, full_config: dict, applied_set: set[str], viewed_set: dict[str, bool], record_viewed: callable):
     """Navigate to a vacancy page and extract its content."""
     try:
         driver.get(href)
@@ -180,13 +185,22 @@ def _fetch_vacancy_detail(driver, href: str, ai_enabled: bool, full_config: dict
         print(f"\n  ⏭️  SKIP — already applied: {href[:80]}...")
         return None
 
+    # Extract name and company
+    title_text = _extract_title(driver)
+    company_text = _extract_company(driver)
+
+    # Skip already-viewed vacancies (by name + company)
+    if company_text and is_viewed(title_text, company_text):
+        print(f"\n  📖 SKIP — already viewed: {title_text} @ {company_text}")
+        return None
+
     current_vacancy = {"link": href}
 
     # --- AI analysis ---
-    title_text = _extract_title(driver)
-
     ts = time.strftime("[%Y-%m-%d %H:%M:%S]")
     print(f"\n  {ts}  {len(current_vacancy)}+1. 📎 Vacancy: {title_text or 'Не указано'}")
+    if company_text:
+        print(f"     🏢 Company: {company_text}")
     print(f"     🔗 {href}")
 
     if ai_enabled and full_desc:
@@ -204,6 +218,10 @@ def _fetch_vacancy_detail(driver, href: str, ai_enabled: bool, full_config: dict
 
     elif ai_enabled and not full_desc:
         print(f"  ⚠️ Full description is empty — skipping AI analysis")
+
+    # Record as viewed
+    if title_text:
+        record_viewed(title_text, company_text or "")
 
     return current_vacancy
 
@@ -276,3 +294,23 @@ def _has_next_page(driver) -> bool:
         except Exception:
             continue
     return False
+
+
+def _extract_company(driver) -> str:
+    """Extract the company name from the vacancy detail page."""
+    for sel in [
+        "a[href*='employers'] .h8",
+        "a[href*='employers'] .vacancy-header__company",
+        "a[data-qa='vacancy-comp-name'] h2",
+        "a[data-qa='vacancy-comp-name']",
+        ".vacancy__company-name",
+        "h1 + * .h8",
+    ]:
+        try:
+            el = driver.find_element("css selector", sel)
+            text = el.text.strip()
+            if text:
+                return text
+        except Exception:
+            continue
+    return ""
