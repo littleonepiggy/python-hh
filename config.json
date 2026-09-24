@@ -1,0 +1,43 @@
+{
+  "cookie_sources": [
+    {
+      "name": "hh",
+      "site": "https://hh.ru/"
+    }
+  ],
+  "driver_browser": "chrome_canary",
+  "selenium_options": {
+    "headless": true,
+    "window_size": [
+      1920,
+      1080
+    ]
+  },
+  "cookie_lifetime_hours": 48,
+  "search_config": {
+    "base_url": "https://hh.ru/search/vacancy",
+    "query_params": {
+      "ored_clusters": true,
+      "text": "PHP",
+      "order_by": "publication_time"
+    },
+    "max_pages": 1,
+    "max_vacancies_per_page": 48,
+    "delay_range": [
+      1.0,
+      1.5
+    ],
+    "page": null
+  },
+  "llama_config": {
+    "url": "http://localhost:8080/v1/chat/completions",
+    "model": "qwen3.6-35B-A3B-UD-Q4_K_M",
+    "api_key": ""
+  },
+  "contact": {
+    "telegram": "",
+    "phone": ""
+  },
+  "ai_prompt": "Ты — ассистент по анализу вакансий..."
+
+}
