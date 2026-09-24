@@ -106,16 +106,12 @@ def scrape_vacancies(driver, search_config: dict, full_config: dict | None = Non
                 continue
             duplicates.add(href)
 
-            print(f"  -> Extracting detail #{len(vacancies)+1}: {href[:80]}...")
-
-            vacancy = _fetch_vacancy_detail(driver, href, ai_enabled, full_config, applied_set, viewed_set, record_viewed)
+            vacancy = _fetch_vacancy_detail(driver, href, ai_enabled, full_config, applied_set, viewed_set, record_viewed, len(vacancies) + 1)
             if vacancy is not None:
                 vacancies.append(vacancy)
                 scraped_on_this_page += 1
 
             _delay()
-
-        print(f"\n  ✅ Scraped {scraped_on_this_page} vacancy(s) from page {current_page}")
 
         if current_page >= max_pages:
             print(f"\n  ⏹️  Reached max pages ({max_pages}). Done.")
@@ -131,7 +127,6 @@ def scrape_vacancies(driver, search_config: dict, full_config: dict | None = Non
     output_path = PROJECT_DIR / "vacancies.json"
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(vacancies, f, ensure_ascii=False, indent=2)
-    print(f"\n  ✅ Saved {len(vacancies)} vacancies to {output_path}")
 
     return vacancies
 
@@ -165,7 +160,7 @@ def _extract_vacancy_links(driver) -> list[str]:
     return href_list
 
 
-def _fetch_vacancy_detail(driver, href: str, ai_enabled: bool, full_config: dict, applied_set: set[str], viewed_set: dict[str, bool], record_viewed: callable):
+def _fetch_vacancy_detail(driver, href: str, ai_enabled: bool, full_config: dict, applied_set: set[str], viewed_set: dict[str, bool], record_viewed: callable, vacancy_number: int):
     """Navigate to a vacancy page and extract its content."""
     try:
         driver.get(href)
@@ -198,7 +193,7 @@ def _fetch_vacancy_detail(driver, href: str, ai_enabled: bool, full_config: dict
 
     # --- AI analysis ---
     ts = time.strftime("[%Y-%m-%d %H:%M:%S]")
-    print(f"\n  {ts}  {len(current_vacancy)}+1. 📎 Vacancy: {title_text or 'Не указано'}")
+    print(f"\n  {ts}  #{vacancy_number}. 📎 Vacancy: {title_text or 'Не указано'}")
     if company_text:
         print(f"     🏢 Company: {company_text}")
     print(f"     🔗 {href}")
