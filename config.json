@@ -19,9 +19,9 @@
     "query_params": {
       "ored_clusters": true,
       "text": "PHP",
-      "order_by": "publication_time"
+      "order_by": "relevance"
     },
-    "max_pages": 1,
+    "max_pages": 2,
     "max_vacancies_per_page": 48,
     "delay_range": [
       1.0,

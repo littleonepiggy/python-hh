@@ -275,21 +275,24 @@ def _has_next_page(driver) -> bool:
 def _extract_listing_info(driver) -> list[tuple[str, str, str]]:
     """Extract (title, company, href) from all vacancy cards on the search page."""
     results: list[tuple[str, str, str]] = []
-    # Each vacancy card is in a block with a title link and company link
-    cards = driver.find_elements("css selector", "a[data-qa='search-vacancy-title']")
-    for card in cards:
+    # Each vacancy card: title link uses data-qa="serp-item__title",
+    # company link uses data-qa="vacancy-serp__vacancy-employer"
+    title_links = driver.find_elements("css selector", "a[data-qa='serp-item__title']")
+    for card in title_links:
         try:
-            # Get title text and href from the title link itself
-            title = card.text.strip()
+            # Get title text from the inner span with data-qa="serp-item__title-text"
+            title_el = card.find_element("css selector", "span[data-qa='serp-item__title-text']")
+            title = title_el.text.strip()
             href = card.get_attribute("href")
             if not href:
                 continue
 
-            # Company is in the same card block, look for company link
+            # Company is in the same card block
             company = ""
             try:
-                company_el = card.find_element("css selector", "a[data-qa='search-vacancy-company-link']")
-                company = company_el.text.strip()
+                company_el = card.find_element("css selector", "a[data-qa='vacancy-serp__vacancy-employer']")
+                company_text_el = company_el.find_element("css selector", "span[data-qa='vacancy-serp__vacancy-employer-text']")
+                company = company_text_el.text.strip()
             except Exception:
                 pass
             results.append((title, company, href))
