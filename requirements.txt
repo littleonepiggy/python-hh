@@ -1,0 +1,3 @@
+# Third-party dependencies for python-hh
+selenium
+requests  # used by ai_analyzer.py for the OpenAI-compatible LLM API

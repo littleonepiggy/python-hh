@@ -3,26 +3,56 @@
 import json
 import sqlite3
 import os
+import shutil
+import tempfile
 from pathlib import Path
 import glob
 
 
+def _open_db_copy(db_file: Path) -> Path:
+    """Copy a (possibly locked) SQLite db to a temp file for safe reading.
+
+    Firefox keeps cookies.sqlite open with an exclusive lock, so reading it
+    in place fails with 'database is locked'. Copying the db together with
+    its -wal/-shm sidecars lets us replay pending writes safely.
+    """
+    tmp_dir = tempfile.mkdtemp(prefix="ffcookies_")
+    tmp_db = Path(tmp_dir) / db_file.name
+    shutil.copy2(db_file, tmp_db)
+    for suffix in ("-wal", "-shm"):
+        sidecar = db_file.with_name(db_file.name + suffix)
+        if sidecar.exists():
+            shutil.copy2(sidecar, tmp_db.with_name(tmp_db.name + suffix))
+    return tmp_db
+
+
 def get_firefox_profiles_ini() -> Path | None:
-    """Locate the profiles.ini file for Firefox."""
-    # Check common locations
+    """Locate the profiles.ini file for Firefox (Windows, Linux, snap, flatpak)."""
     candidates = [
+        # Windows
         Path.home() / "AppData" / "Roaming" / "Mozilla" / "Firefox" / "profiles.ini",
+        # Linux (native install)
+        Path.home() / ".mozilla" / "firefox" / "profiles.ini",
+        # Linux (Firefox snap: ~/.snap/firefox/common/.mozilla/firefox/)
+        Path.home() / "snap" / "firefox" / "common" / ".mozilla" / "firefox" / "profiles.ini",
+        # Flatpak
+        Path.home() / ".var" / "app" / "org.mozilla.firefox" / ".mozilla" / "firefox" / "profiles.ini",
+        # macOS
+        Path.home() / "Library" / "Application Support" / "Firefox" / "profiles.ini",
+        # Fallback
         Path.home() / "firefox_profiles.ini",
     ]
-    # Also try environment variable paths
-    for env in ["APPDATA"]:
-        if env == "APPDATA":
-            appdata = os.environ.get("APPDATA", "")
-            candidates.append(Path(appdata) / "Mozilla" / "Firefox" / "profiles.ini")
 
     for p in candidates:
         if p.exists():
             return p
+
+    # Last resort: search for the snap profile even if not at the standard depth
+    snap_firefox = Path.home() / "snap" / "firefox"
+    if snap_firefox.exists():
+        for ini in snap_firefox.rglob("profiles.ini"):
+            return ini
+
     return None
 
 
@@ -89,6 +119,11 @@ def extract_cookies_profile(profile_path: str, site_url: str) -> list[dict]:
             if not (fname == "cookies.sqlite" or fname == "cookieData.sqlite"):
                 continue
             db_file = Path(full_path)
+            # Firefox holds an exclusive lock on the live db — work on a copy
+            try:
+                db_file = _open_db_copy(db_file)
+            except OSError:
+                continue
             # Verify it's actually a valid sqlite DB before using it
             try:
                 conn = _sqlite3.connect(str(db_file))
@@ -101,12 +136,19 @@ def extract_cookies_profile(profile_path: str, site_url: str) -> list[dict]:
                     continue
             except (_sqlite3.DatabaseError, _sqlite3.OperationalError):
                 # Not a valid sqlite DB — skip to next file
+                try:
+                    shutil.rmtree(db_file.parent)
+                except OSError:
+                    pass
                 continue
 
             try:
-                return parse_cookies(db_file, site_url)
+                cookies = parse_cookies(db_file, site_url)
+                shutil.rmtree(db_file.parent, ignore_errors=True)
+                return cookies
             except Exception:
                 # Bad cookie DB (corrupt/incompatible) — continue search
+                shutil.rmtree(db_file.parent, ignore_errors=True)
                 continue
 
     return []  # No cookie DB found in this profile; caller tries next profile

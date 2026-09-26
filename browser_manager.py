@@ -1,6 +1,7 @@
 """Chrome browser creation and cookie management."""
 
 import sys
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -10,31 +11,64 @@ from selenium.webdriver.chrome.service import Service
 
 
 def find_chrome_bin(browser_name: str) -> str | None:
-    """Look up the right Chrome executable based on config setting."""
-    if browser_name == "chrome_canary":
-        candidates = [
-            r"C:/Program Files/Google/Chrome SxS/Application/chrome.exe",
-            r"C:/Users/user/AppData/Local/Google/Chrome SxS/Application/chrome.exe",
-            r"C:/Program Files (x86)/Google/Chrome SxS/Application/chrome.exe",
-            r"C:/Program Files/Chromium/Application/chrome.exe",
-        ]
+    """Look up the right Chrome/Chromium executable based on config setting."""
+    is_canary = browser_name == "chrome_canary"
+
+    candidates: list[str] = []
+    if sys.platform == "win32":
+        # Windows
+        if is_canary:
+            candidates = [
+                r"C:/Program Files/Google/Chrome SxS/Application/chrome.exe",
+                r"C:/Users/user/AppData/Local/Google/Chrome SxS/Application/chrome.exe",
+                r"C:/Program Files (x86)/Google/Chrome SxS/Application/chrome.exe",
+                r"C:/Program Files/Chromium/Application/chrome.exe",
+            ]
+        else:
+            candidates = [
+                r"C:/Program Files/Google/Chrome/Application/chrome.exe",
+                r"C:/Program Files (x86)/Google/Chrome/Application/chrome.exe",
+                r"C:/Users/user/AppData/Local/Google/Chrome/Application/chrome.exe",
+            ]
     else:
-        candidates = [
-            r"C:/Program Files/Google/Chrome/Application/chrome.exe",
-            r"C:/Program Files (x86)/Google/Chrome/Application/chrome.exe",
-            r"C:/Users/user/AppData/Local/Google/Chrome/Application/chrome.exe",
-        ]
+        # Linux / macOS
+        if is_canary:
+            candidates = [
+                "/opt/google/chrome-unstable/chrome",
+                "/usr/bin/google-chrome-unstable",
+                "/usr/bin/google-chrome-beta",
+                "/snap/chromium/current/usr/lib/chromium-browser/chrome",
+                "/usr/bin/chromium-browser",
+                "/usr/bin/chromium",
+            ]
+        else:
+            candidates = [
+                "/opt/google/chrome/chrome",
+                "/usr/bin/google-chrome-stable",
+                "/usr/bin/google-chrome",
+                "/snap/chromium/current/usr/lib/chromium-browser/chrome",
+                "/usr/bin/chromium-browser",
+                "/usr/bin/chromium",
+            ]
 
     for candidate in candidates:
         if Path(candidate).exists():
             return candidate
 
-    # Fallback: search via where command
+    # Fallback: search via where (Windows) / shutil.which (Linux, macOS)
     try:
-        out = subprocess.check_output(["where", "chrome.exe"], text=True, stderr=subprocess.DEVNULL)
-        for line in out.strip().splitlines():
-            if Path(line.strip()).exists():
-                return line.strip()
+        if sys.platform == "win32":
+            out = subprocess.check_output(["where", "chrome.exe"], text=True, stderr=subprocess.DEVNULL)
+            for line in out.strip().splitlines():
+                if Path(line.strip()).exists():
+                    return line.strip()
+        else:
+            for exe in (["google-chrome-unstable", "google-chrome-beta", "chromium", "chromium-browser", "google-chrome"]
+                        if is_canary else
+                        ["google-chrome", "google-chrome-stable", "chromium", "chromium-browser"]):
+                resolved = shutil.which(exe)
+                if resolved:
+                    return resolved
     except Exception:
         pass
 
@@ -45,10 +79,9 @@ def create_driver(browser_name: str, full_config: dict | None = None) -> webdriv
     """Create a Selenium WebDriver for the requested Chrome build."""
     chrome_exe = find_chrome_bin(browser_name)
     if not chrome_exe:
-        label = "Chrome Canary" if browser_name == "chrome_canary" else "Google Chrome"
+        label = "Chrome Canary/Unstable or Chromium" if browser_name == "chrome_canary" else "Google Chrome or Chromium"
         print(f"Error: {label} not found on this machine.")
-        install_url = "canary" if browser_name == "chrome_canary" else ""
-        print(f"Install it from: https://www.google.com/chrome/{install_url}")
+        print("Install it via: sudo snap install chromium  (or apt install chromium-browser)")
         sys.exit(1)
 
     print(f"  Using {browser_name.replace('_', ' ').title()}: {chrome_exe}")
@@ -85,10 +118,19 @@ def create_driver(browser_name: str, full_config: dict | None = None) -> webdriv
 
 
 def _get_user_data_dir(browser_name: str) -> Path:
-    """Return the user-data-dir path for the given browser."""
+    """Return the user-data-dir path for the given browser (per-OS)."""
+    home = Path.home()
+    if sys.platform == "win32":
+        if browser_name == "chrome_canary":
+            return home / "AppData" / "Local" / "Google" / "Chrome SxS" / "User Data"
+        return home / "AppData" / "Local" / "Google" / "Chrome" / "User Data"
+    if sys.platform == "darwin":
+        suffix = "Canary" if browser_name == "chrome_canary" else ""
+        return home / "Library" / "Application Support" / "Google" / ("Chrome" + suffix)
+    # Linux
     if browser_name == "chrome_canary":
-        return Path.home() / "AppData" / "Local" / "Google" / "Chrome Canary" / "User Data"
-    return Path.home() / "AppData" / "Local" / "Google" / "Chrome" / "User Data"
+        return home / "snap" / "chromium" / "common" / "chromium"
+    return home / ".config" / "chromium" / "User Data"
 
 
 def paste_cookies(driver, cookies: list[dict]) -> None:
