@@ -34,7 +34,7 @@
     "url": "https://opencode.ai/zen/go/v1/chat/completions",
     "model": "glm-5.3-flash",
     "api_key": "",
-    "session_id": "python-hh-vacancy-scraper",
+    "session_id": "",
     "max_tokens": 8192,
     "timeout": 120
   },

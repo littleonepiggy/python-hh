@@ -8,13 +8,13 @@ Supports two providers, selected via the 'ai_provider' key in config.json:
 import json
 import os
 import sqlite3
+import uuid
 from pathlib import Path
 
 from config_loader import build_ai_prompt
 
 
 OPENCODE_GO_URL = "https://opencode.ai/zen/go/v1/chat/completions"
-OPENCODE_SESSION_ID = "python-hh-vacancy-scraper"
 
 # HTTP client lookup order
 _HTTP_CLIENTS = [
@@ -130,10 +130,13 @@ def analyze_vacancy(small_desc: str, full_desc: str, config: dict):
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
 
-    # opencode Go routing hint (required by the Go endpoint)
+    # opencode Go requires the routing hint, but it doesn't have to be a
+    # persistent id — use a throwaway one per request unless a fixed
+    # session_id is set in config.
     if config.get("ai_provider") == "opencode":
-        headers["x-opencode-session"] = config.get("opencode_config", {}).get(
-            "session_id", OPENCODE_SESSION_ID
+        oc_cfg = config.get("opencode_config", {})
+        headers["x-opencode-session"] = (
+            oc_cfg.get("session_id") or f"pyhh-{uuid.uuid4().hex[:12]}"
         )
 
     provider_label = config.get("ai_provider", "local")
