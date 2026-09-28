@@ -5,6 +5,10 @@ from pathlib import Path
 
 PROJECT_DIR = Path(__file__).resolve().parent
 
+# Optional gitignored file holding the full AI prompt. If it exists it
+# overrides config.json's "ai_prompt" placeholder.
+AI_PROMPT_FILE = PROJECT_DIR / "ai_prompt.txt"
+
 
 def load_config(config_path: str = "config.json") -> dict:
     """Load and return config.json."""
@@ -13,8 +17,10 @@ def load_config(config_path: str = "config.json") -> dict:
 
 
 def build_ai_prompt(config: dict) -> str:
-    """Load prompt template from config and substitute contact placeholders."""
+    """Load prompt template from file or config and substitute contacts."""
     raw = config.get("ai_prompt", "")
+    if AI_PROMPT_FILE.exists():
+        raw = AI_PROMPT_FILE.read_text(encoding="utf-8")
     if not raw:
         return ""
     contact = config.get("contact", {})

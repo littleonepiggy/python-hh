@@ -18,6 +18,9 @@ viewed.json
 scrape_output.txt
 index.html
 
+# Local AI prompt (full prompt lives here, outside the repo)
+ai_prompt.txt
+
 # Temp files
 *.sqlite
 *.sqlite-wal
