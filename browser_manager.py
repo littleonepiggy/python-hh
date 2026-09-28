@@ -1,6 +1,7 @@
 """Chrome browser creation and cookie management."""
 
 import sys
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -17,10 +18,13 @@ def find_chrome_bin(browser_name: str) -> str | None:
     candidates: list[str] = []
     if sys.platform == "win32":
         # Windows
+        local_appdata = os.environ.get(
+            "LOCALAPPDATA", str(Path.home() / "AppData" / "Local")
+        )
         if is_canary:
             candidates = [
                 r"C:/Program Files/Google/Chrome SxS/Application/chrome.exe",
-                r"C:/Users/user/AppData/Local/Google/Chrome SxS/Application/chrome.exe",
+                rf"{local_appdata}/Google/Chrome SxS/Application/chrome.exe",
                 r"C:/Program Files (x86)/Google/Chrome SxS/Application/chrome.exe",
                 r"C:/Program Files/Chromium/Application/chrome.exe",
             ]
@@ -28,7 +32,7 @@ def find_chrome_bin(browser_name: str) -> str | None:
             candidates = [
                 r"C:/Program Files/Google/Chrome/Application/chrome.exe",
                 r"C:/Program Files (x86)/Google/Chrome/Application/chrome.exe",
-                r"C:/Users/user/AppData/Local/Google/Chrome/Application/chrome.exe",
+                rf"{local_appdata}/Google/Chrome/Application/chrome.exe",
             ]
     else:
         # Linux / macOS

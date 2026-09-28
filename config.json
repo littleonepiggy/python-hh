@@ -29,6 +29,15 @@
     ],
     "page": null
   },
+  "ai_provider": "opencode",
+  "opencode_config": {
+    "url": "https://opencode.ai/zen/go/v1/chat/completions",
+    "model": "glm-5.3-flash",
+    "api_key": "",
+    "session_id": "python-hh-vacancy-scraper",
+    "max_tokens": 8192,
+    "timeout": 120
+  },
   "llama_config": {
     "url": "http://localhost:8080/v1/chat/completions",
     "model": "qwen3.6-35B-A3B-UD-Q4_K_M",

@@ -17,6 +17,16 @@ vacancies.json
 viewed.json
 scrape_output.txt
 
+# Temp files
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.db
+*.log
+tmp/
+.temp/
+*.tmp
+
 # OS
 .DS_Store
 Thumbs.db
