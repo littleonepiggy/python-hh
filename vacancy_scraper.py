@@ -40,21 +40,24 @@ def scrape_vacancies(driver, search_config: dict, full_config: dict | None = Non
 
     vacancies: list[dict] = []
     ai_enabled = "llama_config" in (full_config or {})
+    existing_links = {e.get("link") for e in existing}
 
-    # Load already-applied links from existing vacancies.json
+    # Load existing vacancies.json: skip already-applied links and keep
+    # old entries so the file only grows (new runs append, never overwrite)
     applied_set: set[str] = set()
+    existing: list[dict] = []
     try:
         existing_path = PROJECT_DIR / "vacancies.json"
         if existing_path.exists():
             with open(existing_path, "r", encoding="utf-8") as ef:
-                existing: list[dict] = json.load(ef)
+                existing = json.load(ef)
             for entry in existing:
                 link = entry.get("link", "")
                 analysis = entry.get("analysis", {}) or {}
                 if analysis.get("applied", False):
                     applied_set.add(link)
     except Exception:
-        pass
+        existing = []
 
     # Load viewed vacancies (name + company)
     viewed_set = load_viewed()
@@ -65,6 +68,7 @@ def scrape_vacancies(driver, search_config: dict, full_config: dict | None = Non
     print(f"\n  Starting scrape on {base_url}...")
     print(f"  ⏭️  Start page: {start_page}")
     print(f"  ⏭️  Will skip {len(applied_set)} already-applied vacancy(es).")
+    print(f"  ⏭️  Will skip {len(existing_links)} vacancy(es) already present in vacancies.json.")
 
     page = start_page - 1  # convert to 0-based index for internal use
 
@@ -103,6 +107,11 @@ def scrape_vacancies(driver, search_config: dict, full_config: dict | None = Non
             if href in duplicates:
                 continue
 
+            # Already in the file from a previous run — keep old entry as is
+            if href in existing_links:
+                print(f"  📁 SKIP — already in vacancies.json: {href[:80]}...")
+                continue
+
             # Check if already viewed (by name + company) BEFORE navigating
             if is_viewed(title, company):
                 print(f"  📖 SKIP — already viewed: {title} @ {company}")
@@ -127,11 +136,12 @@ def scrape_vacancies(driver, search_config: dict, full_config: dict | None = Non
 
         page += 1
 
-    # --- Save to JSON file (sorted by analysis score, best first) ---
-    vacancies.sort(key=_score_sort_key, reverse=True)
+    # --- Save to JSON file: old entries + new ones, sorted best-first ---
+    combined = existing + vacancies
+    combined.sort(key=_score_sort_key, reverse=True)
     output_path = PROJECT_DIR / "vacancies.json"
     with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(vacancies, f, ensure_ascii=False, indent=2)
+        json.dump(combined, f, ensure_ascii=False, indent=2)
 
     return vacancies
 

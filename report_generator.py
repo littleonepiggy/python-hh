@@ -64,7 +64,7 @@ def _render_card(entry: dict) -> str:
         badge = f'<div class="score {_score_class(score)}">{int(score)}%</div>'
 
     parts = [f'<div class="card">']
-    parts.append(badge)
+    parts.append(f'<div class="score-col">{badge}<button class="hide-btn" title="Скрыть вакансию">✕</button></div>')
     parts.append('<div class="body">')
     parts.append(f'<a class="title" href="{_esc(link)}" target="_blank">{_esc(title)}</a>')
     parts.append('<div class="meta">')
@@ -117,9 +117,17 @@ def generate_report(vacancies: list[dict], report_path: Path = REPORT_PATH) -> P
   .card {{ display: flex; gap: 16px; background: #fff; border: 1px solid #e2e4e8;
           border-radius: 10px; padding: 16px; margin-bottom: 12px;
           box-shadow: 0 1px 2px rgba(0,0,0,.04); }}
-  .score {{ flex: 0 0 64px; height: 64px; border-radius: 10px; display: flex;
+  .score-col {{ flex: 0 0 64px; display: flex; flex-direction: column;
+               align-items: center; gap: 6px; }}
+  .score {{ width: 64px; height: 64px; border-radius: 10px; display: flex;
            align-items: center; justify-content: center;
            font-size: 18px; font-weight: 700; color: #fff; }}
+  .hide-btn {{ background: none; border: none; color: #999; font-size: 14px;
+              cursor: pointer; padding: 2px 8px; border-radius: 6px; }}
+  .hide-btn:hover {{ background: #e8e8e8; color: #d05454; }}
+  .show-hidden {{ background: #e8f0fe; color: #1a5dab; border: none;
+                 border-radius: 10px; padding: 2px 10px; cursor: pointer;
+                 font-size: 12px; }}
   .score.good {{ background: #2e9e5b; }}
   .score.mid  {{ background: #e0a52e; }}
   .score.low  {{ background: #d05454; }}
@@ -149,8 +157,30 @@ def generate_report(vacancies: list[dict], report_path: Path = REPORT_PATH) -> P
 </head>
 <body>
 <h1>🕸️ HH вакансии — анализ</h1>
-<div class="sub">Отсортировано по релевантности: лучшие сверху. Нажмите на название, чтобы открыть вакансию.</div>
+<div class="sub">Отсортировано по релевантности: лучшие сверху. Нажмите на название, чтобы открыть вакансию. Нажмите ✕ под оценкой, чтобы скрыть вакансию. <button id="show-hidden" class="show-hidden" style="display:none">👁 показать скрытые</button></div>
 {cards}
+<script>
+  const showBtn = document.getElementById('show-hidden');
+  let hiddenCount = 0;
+  showBtn.onclick = () => {{
+    document.querySelectorAll('.card.hidden').forEach(c => {{
+      c.classList.remove('hidden');
+      c.style.display = '';
+    }});
+    hiddenCount = 0;
+    showBtn.style.display = 'none';
+  }};
+  document.querySelectorAll('.hide-btn').forEach(btn => {{
+    btn.onclick = () => {{
+      const card = btn.closest('.card');
+      card.style.display = 'none';
+      card.classList.add('hidden');
+      hiddenCount++;
+      showBtn.style.display = 'inline-block';
+      showBtn.textContent = `👁 показать скрытые (${{hiddenCount}})`;
+    }};
+  }});
+</script>
 </body>
 </html>
 """
