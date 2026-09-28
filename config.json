@@ -43,10 +43,5 @@
     "model": "qwen3.6-35B-A3B-UD-Q4_K_M",
     "api_key": ""
   },
-  "contact": {
-    "telegram": "",
-    "phone": ""
-  },
   "ai_prompt": "Ты — ассистент по анализу вакансий..."
-
 }

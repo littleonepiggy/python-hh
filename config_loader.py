@@ -9,11 +9,29 @@ PROJECT_DIR = Path(__file__).resolve().parent
 # overrides config.json's "ai_prompt" placeholder.
 AI_PROMPT_FILE = PROJECT_DIR / "ai_prompt.txt"
 
+# Optional gitignored file holding personal contact info:
+#   {"telegram": "@handle", "phone": "79990000000"}
+CONTACTS_FILE = PROJECT_DIR / "contacts.json"
+
 
 def load_config(config_path: str = "config.json") -> dict:
-    """Load and return config.json."""
+    """Load config.json and merge in optional local overrides.
+
+    Personal data (contacts) lives in the gitignored contacts.json when
+    present, so tracked config.json can stay free of personal info.
+    """
     with open(config_path, "r", encoding="utf-8") as f:
-        return json.load(f)
+        config = json.load(f)
+
+    if CONTACTS_FILE.exists():
+        try:
+            contacts = json.loads(CONTACTS_FILE.read_text(encoding="utf-8"))
+            if contacts:
+                config["contact"] = contacts
+        except (json.JSONDecodeError, OSError) as e:
+            print(f"  ⚠️  Could not read {CONTACTS_FILE.name}: {e} — using config contact.")
+
+    return config
 
 
 def build_ai_prompt(config: dict) -> str:

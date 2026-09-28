@@ -21,6 +21,9 @@ index.html
 # Local AI prompt (full prompt lives here, outside the repo)
 ai_prompt.txt
 
+# Personal contact info (outside the repo)
+contacts.json
+
 # Temp files
 *.sqlite
 *.sqlite-wal
