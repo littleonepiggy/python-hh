@@ -10,6 +10,7 @@ from config_loader import load_config, validate_config
 from browser_manager import create_driver, paste_cookies
 from vacancy_scraper import scrape_vacancies
 from cookie_fetcher import get_cookies_from_firefox
+from report_generator import generate_and_open_report
 
 
 def parse_args() -> argparse.Namespace:
@@ -118,6 +119,11 @@ def main():
         finally:
             driver.quit()
             print("  🔒 Browser closed.")
+
+    # --- Report ---
+    print(f"\n{'=' * 60}")
+    print("  📊 Generating report...")
+    generate_and_open_report()
 
 
 if __name__ == "__main__":

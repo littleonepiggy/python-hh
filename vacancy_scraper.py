@@ -127,12 +127,22 @@ def scrape_vacancies(driver, search_config: dict, full_config: dict | None = Non
 
         page += 1
 
-    # --- Save to JSON file ---
+    # --- Save to JSON file (sorted by analysis score, best first) ---
+    vacancies.sort(key=_score_sort_key, reverse=True)
     output_path = PROJECT_DIR / "vacancies.json"
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(vacancies, f, ensure_ascii=False, indent=2)
 
     return vacancies
+
+
+def _score_sort_key(vacancy: dict) -> float:
+    """Sort key by analysis score; entries without a score sink to the end."""
+    raw = (vacancy.get("analysis") or {}).get("score")
+    try:
+        return float(str(raw).rstrip("%"))
+    except (TypeError, ValueError, AttributeError):
+        return -1.0
 
 
 def _extract_vacancy_links(driver) -> list[str]:
@@ -184,7 +194,7 @@ def _fetch_vacancy_detail(driver, href: str, title: str, company: str, ai_enable
         print(f"\n  ⏭️  SKIP — already applied: {href[:80]}...")
         return None
 
-    current_vacancy = {"link": href}
+    current_vacancy = {"link": href, "title": title, "company": company}
 
     # --- AI analysis ---
     ts = time.strftime("[%Y-%m-%d %H:%M:%S]")

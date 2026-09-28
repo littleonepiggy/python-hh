@@ -16,6 +16,7 @@ env/
 vacancies.json
 viewed.json
 scrape_output.txt
+index.html
 
 # Temp files
 *.sqlite
