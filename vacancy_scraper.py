@@ -1,6 +1,7 @@
 """Core vacancy scraping logic: page iteration, DOM parsing, and JSON save."""
 
 import json
+import html
 import time
 import random
 from pathlib import Path
@@ -211,7 +212,6 @@ def _fetch_vacancy_detail(driver, href: str, title: str, company: str, ai_enable
     print(f"     🔗 {href}")
 
     if ai_enabled and full_desc:
-        print(f"  🤖 Analyzing with AI...")
         try:
             result = analyze_vacancy(small_desc, full_desc, full_config)
             if result:
@@ -244,30 +244,48 @@ def _extract_small_desc(driver) -> str:
     return ""
 
 
+def _strip_hh_footer(full_desc: str) -> str:
+    """Remove the 'Ask the employer / workplace location' footer HH appends."""
+    low = full_desc.lower()
+    ask_idx = low.find("ask the employer")
+    place_idx = low.find("where is the workplace located")
+    cut_idx = min((i for i in (ask_idx, place_idx) if i >= 0), default=len(full_desc))
+    return full_desc[:cut_idx].rstrip()
+
+
 def _extract_full_desc(driver) -> str:
     """Extract the full job description text."""
-    for sel in [".vacancy-description", "div.vacancy-description-content",
-                "div[itemtype='http://schema.org/JobPosting']"]:
+    # data-qa is HH's own stable test attribute; CSS classes change often
+    for sel in ["div[data-qa='vacancy-description']", ".g-user-content",
+                ".vacancy-description", "div.vacancy-description-content"]:
         try:
             desc_el = driver.find_element("css selector", sel)
             break
         except Exception:
             desc_el = None
 
-    if not desc_el:
-        return ""
+    if desc_el:
+        time.sleep(1)
+        full_desc = desc_el.text.strip().replace("\r\n", "\n").replace("\n", " ")
+        return _strip_hh_footer(full_desc)
 
-    time.sleep(1)
-    full_desc = desc_el.text.strip().replace("\r\n", "\n").replace("\n", " ")
+    # Fallback: JSON-LD structured data (script[@type='application/ld+json'])
+    import re
+    try:
+        for el in driver.find_elements("css selector", "script[type='application/ld+json']"):
+            data = json.loads(el.get_attribute("innerHTML"))
+            if not isinstance(data, dict) or data.get("@type") != "JobPosting":
+                continue
+            raw = data.get("description", "")
+            if not raw:
+                continue
+            text = html.unescape(re.sub(r"<[^>]+>", " ", raw))
+            text = re.sub(r"\s+", " ", text).strip()
+            return _strip_hh_footer(text)
+    except Exception:
+        pass
 
-    # Strip the "Ask the employer / where is the workplace" footer appended by HH.ru
-    low = full_desc.lower()
-    ask_idx = low.find("ask the employer")
-    place_idx = low.find("where is the workplace located")
-    cut_idx = min((i for i in (ask_idx, place_idx) if i >= 0), default=len(full_desc))
-    full_desc = full_desc[:cut_idx].rstrip()
-
-    return full_desc
+    return ""
 
 
 def _extract_listing_info(driver) -> list[tuple[str, str, str]]:
