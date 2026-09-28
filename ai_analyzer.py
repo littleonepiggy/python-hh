@@ -139,9 +139,6 @@ def analyze_vacancy(small_desc: str, full_desc: str, config: dict):
     provider_label = config.get("ai_provider", "local")
     print(f"  🤖 Analyzing with AI ({provider_label}: {model or 'default'})...")
 
-    provider_label = config.get("ai_provider", "local")
-    print(f"  🤖 Analyzing with AI ({provider_label}: {model or 'default'})...")
-
     try:
         request_body = {
             "model": model,
