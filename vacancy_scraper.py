@@ -130,10 +130,6 @@ def scrape_vacancies(driver, search_config: dict, full_config: dict | None = Non
             print(f"\n  ⏹️  Reached max pages ({max_pages}). Done.")
             break
 
-        if not _has_next_page(driver):
-            print(f"\n  ⏹️  No 'Next' button found. End of results.")
-            break
-
         page += 1
 
     # --- Save to JSON file: old entries + new ones, sorted best-first ---
@@ -271,25 +267,6 @@ def _extract_full_desc(driver) -> str:
     full_desc = full_desc[:cut_idx].rstrip()
 
     return full_desc
-
-
-def _has_next_page(driver) -> bool:
-    """Check if a 'Next' pagination button exists."""
-    next_selectors = [
-        "a[data-qa^='pager.next']",
-        "a.pagination__page-link--next",
-        "button[aria-label*='следующая' i]",
-        "[data-qa^='pager'] a[href]:not([disabled])",
-        ".pagination a:last-child:not(.is-not-available)",
-    ]
-    for sel in next_selectors:
-        try:
-            el = driver.find_element("css selector", sel)
-            if el.is_displayed():
-                return True
-        except Exception:
-            continue
-    return False
 
 
 def _extract_listing_info(driver) -> list[tuple[str, str, str]]:
