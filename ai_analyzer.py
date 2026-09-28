@@ -66,8 +66,8 @@ def _get_provider_config(config: dict) -> dict | None:
       - "opencode": use the 'opencode_config' section
 
     The opencode API key is resolved in this order:
-      1. opencode_config.api_key in config.json
-      2. OPENCODE_API_KEY environment variable
+      1. OPENCODE_API_KEY environment variable (preferred)
+      2. opencode_config.api_key in config.json (fallback)
       3. credential stored by the opencode CLI
 
     Returns None (with a printed reason) if the provider is not usable.
@@ -78,10 +78,13 @@ def _get_provider_config(config: dict) -> dict | None:
         oc_cfg = dict(config.get("opencode_config", {}))
         oc_cfg.setdefault("url", OPENCODE_GO_URL)
         oc_cfg.setdefault("model", "glm-5.3-flash")
-        if not oc_cfg.get("api_key"):
-            oc_cfg["api_key"] = (
-                os.environ.get("OPENCODE_API_KEY", "") or _read_opencode_cli_key()
-            )
+        # Env var wins over config so the machine owner always has the
+        # final say; the config value is a portable fallback.
+        oc_cfg["api_key"] = (
+            os.environ.get("OPENCODE_API_KEY", "")
+            or oc_cfg.get("api_key", "")
+            or _read_opencode_cli_key()
+        )
         if not oc_cfg.get("api_key"):
             print("  ⚠️  opencode provider selected but no API key found.")
             print("     Set opencode_config.api_key in config.json, or export OPENCODE_API_KEY.")
