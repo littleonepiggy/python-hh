@@ -40,7 +40,6 @@ def scrape_vacancies(driver, search_config: dict, full_config: dict | None = Non
 
     vacancies: list[dict] = []
     ai_enabled = "llama_config" in (full_config or {})
-    existing_links = {e.get("link") for e in existing}
 
     # Load existing vacancies.json: skip already-applied links and keep
     # old entries so the file only grows (new runs append, never overwrite)
@@ -58,6 +57,8 @@ def scrape_vacancies(driver, search_config: dict, full_config: dict | None = Non
                     applied_set.add(link)
     except Exception:
         existing = []
+
+    existing_links = {e.get("link") for e in existing}
 
     # Load viewed vacancies (name + company)
     viewed_set = load_viewed()
