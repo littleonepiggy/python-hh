@@ -63,8 +63,13 @@ def _render_card(entry: dict) -> str:
     else:
         badge = f'<div class="score {_score_class(score)}">{int(score)}%</div>'
 
-    parts = [f'<div class="card">']
-    parts.append(f'<div class="score-col">{badge}<button class="hide-btn" title="Скрыть вакансию">✕</button></div>')
+    parts = [f'<div class="card" data-link="{_esc(link)}" '
+            f'data-applied="{_esc(bool(analysis.get("applied", False))).lower()}">']
+    parts.append(f'<div class="score-col">{badge}'
+                 f'<div class="btn-row">'
+                 f'<button class="hide-btn" title="Скрыть вакансию">✕</button>'
+                 f'<button class="sent-btn" title="Отметить: отклик отправлен">✔</button>'
+                 f'</div></div>')
     parts.append('<div class="body">')
     parts.append(f'<a class="title" href="{_esc(link)}" target="_blank">{_esc(title)}</a>')
     parts.append('<div class="meta">')
@@ -94,6 +99,8 @@ def _render_card(entry: dict) -> str:
         parts.append(
             f'<details><summary>Подробнее</summary><div class="details">{details_inner}</div></details>'
         )
+    parts.append('</div>')
+    parts.append('<div class="sent-label">✅ Отклик отправлен</div>')
     parts.append("</div></div>")
     return "\n".join(parts)
 
@@ -119,12 +126,22 @@ def generate_report(vacancies: list[dict], report_path: Path = REPORT_PATH) -> P
           box-shadow: 0 1px 2px rgba(0,0,0,.04); }}
   .score-col {{ flex: 0 0 64px; display: flex; flex-direction: column;
                align-items: center; gap: 6px; }}
+  .btn-row {{ display: flex; gap: 2px; }}
   .score {{ width: 64px; height: 64px; border-radius: 10px; display: flex;
            align-items: center; justify-content: center;
            font-size: 18px; font-weight: 700; color: #fff; }}
-  .hide-btn {{ background: none; border: none; color: #999; font-size: 14px;
+  .hide-btn, .sent-btn {{ background: none; border: none; font-size: 14px;
               cursor: pointer; padding: 2px 8px; border-radius: 6px; }}
+  .hide-btn {{ color: #999; }}
   .hide-btn:hover {{ background: #e8e8e8; color: #d05454; }}
+  .sent-btn {{ color: #2e9e5b; }}
+  .sent-btn:hover {{ background: #e2f4e8; }}
+  .card.sent {{ background: #f2faf5; border-color: #bfe3cd; }}
+  .card.sent .sent-btn {{ background: #2e9e5b; color: #fff; border-radius: 6px; }}
+  .sent-label {{ display: none; color: #2e9e5b; font-weight: 600;
+                font-size: 12px; margin-top: 4px; }}
+  .card.sent .sent-label {{ display: inline-block; }}
+  .card.sent .title {{ color: #4d7d5e; }}
   .show-hidden {{ background: #e8f0fe; color: #1a5dab; border: none;
                  border-radius: 10px; padding: 2px 10px; cursor: pointer;
                  font-size: 12px; }}
@@ -178,6 +195,35 @@ def generate_report(vacancies: list[dict], report_path: Path = REPORT_PATH) -> P
       hiddenCount++;
       showBtn.style.display = 'inline-block';
       showBtn.textContent = `👁 показать скрытые (${{hiddenCount}})`;
+    }};
+  }});
+
+  // --- "Отклик отправлен" marks (persisted in localStorage) ---
+  const LS_KEY = 'hh-sent-vacancies';
+  const getSent = () => {{
+    try {{ return new Set(JSON.parse(localStorage.getItem(LS_KEY) || '[]')); }}
+    catch (e) {{ return new Set(); }}
+  }};
+  const sentList = getSent();
+  const saveSent = () => {{
+    try {{ localStorage.setItem(LS_KEY, JSON.stringify([...sentList])); }} catch (e) {{}}
+  }};
+  document.querySelectorAll('.card').forEach(card => {{
+    const link = card.dataset.link;
+    // entries already marked applied in vacancies.json show as sent too
+    if (card.dataset.applied === 'true') card.classList.add('sent');
+    if (sentList.has(link)) card.classList.add('sent');
+    const btn = card.querySelector('.sent-btn');
+    if (!btn) return;
+    btn.onclick = () => {{
+      if (sentList.has(link)) {{
+        sentList.delete(link);
+        card.classList.remove('sent');
+      }} else {{
+        sentList.add(link);
+        card.classList.add('sent');
+      }}
+      saveSent();
     }};
   }});
 </script>
