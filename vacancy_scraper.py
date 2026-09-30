@@ -10,7 +10,6 @@ from urllib.parse import urlencode
 from selenium.common.exceptions import StaleElementReferenceException
 from ai_analyzer import analyze_vacancy
 from output_formatter import print_output
-from viewed_tracker import is_viewed, record_viewed, load_viewed
 
 PROJECT_DIR = Path(__file__).resolve().parent
 
@@ -61,10 +60,6 @@ def scrape_vacancies(driver, search_config: dict, full_config: dict | None = Non
 
     existing_links = {e.get("link") for e in existing}
 
-    # Load viewed vacancies (name + company)
-    viewed_set = load_viewed()
-    print(f"  📖 Loaded {len(viewed_set)} viewed vacancy(es).")
-
     start_page = search_config.get("page", 1)
 
     print(f"\n  Starting scrape on {base_url}...")
@@ -109,19 +104,15 @@ def scrape_vacancies(driver, search_config: dict, full_config: dict | None = Non
             if href in duplicates:
                 continue
 
-            # Already in the file from a previous run — keep old entry as is
+            # Check if already processed in a previous run (by link) BEFORE navigating
+            # (already in vacancies.json = already viewed/analyzed once)
             if href in existing_links:
-                print(f"  📁 SKIP — already in vacancies.json: {href[:80]}...")
-                continue
-
-            # Check if already viewed (by name + company) BEFORE navigating
-            if is_viewed(title, company):
-                print(f"  📖 SKIP — already viewed: {title} @ {company}")
+                print(f"  📁 SKIP — already processed: {href[:80]}...")
                 continue
 
             duplicates.add(href)
 
-            vacancy = _fetch_vacancy_detail(driver, href, title, company, ai_enabled, full_config, applied_set, viewed_set, record_viewed, len(vacancies) + 1)
+            vacancy = _fetch_vacancy_detail(driver, href, title, company, ai_enabled, full_config, applied_set, len(vacancies) + 1)
             if vacancy is not None:
                 vacancies.append(vacancy)
                 scraped_on_this_page += 1
@@ -182,7 +173,7 @@ def _extract_vacancy_links(driver) -> list[str]:
     return href_list
 
 
-def _fetch_vacancy_detail(driver, href: str, title: str, company: str, ai_enabled: bool, full_config: dict, applied_set: set[str], viewed_set: dict[str, bool], record_viewed: callable, vacancy_number: int):
+def _fetch_vacancy_detail(driver, href: str, title: str, company: str, ai_enabled: bool, full_config: dict, applied_set: set[str], vacancy_number: int):
     """Navigate to a vacancy page and extract its content."""
     try:
         driver.get(href)
@@ -225,9 +216,6 @@ def _fetch_vacancy_detail(driver, href: str, title: str, company: str, ai_enable
 
     elif ai_enabled and not full_desc:
         print(f"  ⚠️ Full description is empty — skipping AI analysis")
-
-    # Record as viewed
-    record_viewed(title, company)
 
     return current_vacancy
 

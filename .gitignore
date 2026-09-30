@@ -14,7 +14,6 @@ env/
 
 # Data files (generated, not source)
 vacancies.json
-viewed.json
 scrape_output.txt
 index.html
 
