@@ -174,7 +174,7 @@ def generate_report(vacancies: list[dict], report_path: Path = REPORT_PATH) -> P
 </head>
 <body>
 <h1>🕸️ HH вакансии — анализ</h1>
-<div class="sub">Отсортировано по релевантности: лучшие сверху. Нажмите на название, чтобы открыть вакансию. Нажмите ✕ под оценкой, чтобы скрыть вакансию. <button id="show-hidden" class="show-hidden" style="display:none">👁 показать скрытые</button></div>
+<div class="sub">Отсортировано по релевантности: лучшие сверху. Нажмите на название, чтобы открыть вакансию. Нажмите ✕ под оценкой, чтобы скрыть вакансию, ✔ — отметить отклик отправленным и убрать из списка. <button id="show-hidden" class="show-hidden" style="display:none">👁 показать скрытые</button></div>
 {cards}
 <script>
   const showBtn = document.getElementById('show-hidden');
@@ -222,6 +222,12 @@ def generate_report(vacancies: list[dict], report_path: Path = REPORT_PATH) -> P
       }} else {{
         sentList.add(link);
         card.classList.add('sent');
+        // mark = send it away: hide the card, restore via the toggle below
+        card.style.display = 'none';
+        card.classList.add('hidden');
+        hiddenCount++;
+        showBtn.style.display = 'inline-block';
+        showBtn.textContent = `👁 показать скрытые (${{hiddenCount}})`;
       }}
       saveSent();
     }};
